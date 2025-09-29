@@ -5,11 +5,12 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch: {}
+  workflow_dispatch: {}   # permite ejecutarlo manualmente desde Actions
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,6 +25,46 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-cov httpx
+
+      # Genera modelos dummy para que app/api.py pueda cargar artifacts en CI
+      - name: Prepare artifacts (dummy models for CI)
+        run: |
+          python - <<'PY'
+          import os, numpy as np
+          from joblib import dump
+          from sklearn.neural_network import MLPRegressor
+          from sklearn.preprocessing import StandardScaler
+
+          os.makedirs("app", exist_ok=True)
+
+          def make_artifact(lag, H=7):
+              rngX = np.random.RandomState(0)
+              rngY = np.random.RandomState(1)
+              X = rngX.rand(64, lag)
+              Y = rngY.rand(64, H)
+
+              sx = StandardScaler().fit(X)
+              sy = StandardScaler().fit(Y)
+
+              model = MLPRegressor(hidden_layer_sizes=(8,), max_iter=50, random_state=42)
+              model.fit(sx.transform(X), sy.transform(Y))
+
+              art = {
+                  "model":    model,
+                  "scaler_x": sx,
+                  "scaler_y": sy,
+                  "config": {
+                      "lags": lag, "horizon": H, "target": "Volatility",
+                      "selected": {"fold": 0, "rmse_test": 0.0},
+                      "model_name": "MLPRegressor(dummy)"
+                  }
+              }
+              dump(art, f"app/model_lag{lag}.joblib")
+              print(f"[CI] created app/model_lag{lag}.joblib")
+
+          for lag in (7, 14, 21, 28):
+              make_artifact(lag)
+          PY
 
       - name: Run tests
         env:
