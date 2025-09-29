@@ -47,3 +47,15 @@ btc-volatility-mlops/
 Docker no arranca en Windows: abrir Docker Desktop (WSL2 enabled). Probar docker run hello-world
 >>>>>>> ed749fe (bootstrap: estructura del proyecto + CI)
 
+
+Para predecir se necesita el número de lags y los números de la ventana.
+
+Ejemplo para predecir:
+$body = @{ lag = 14; window = @(0.012,0.011,0.010,0.013,0.009,0.011,0.010,0.012,0.011,0.010,0.009,0.008,0.010,0.011) } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/predict" -ContentType "application/json" -Body $body
+
+
+$r = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/predict" `
+  -ContentType "application/json" -Body $body
+
+$r | ConvertTo-Json -Depth 10
